@@ -1,10 +1,91 @@
 ---
-title: "Homework!"
+title: "Pacific Giant Salamander"
+subtitle: "Prepared for ESM 206"
 author: "Maggie Brickner"
-date: "11/25/2019"
+date: "12/04/2019"
 output: html_document
 ---
 
+##### Introduction
+
+- you need to include an image of a salamander here!
+
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
+#Attach the needed packages. This is a work in progress so for now I'll just attach the tidyverse and janitor. More to come though! If there's a reason to use ggridges that could be cool. 
+library(tidyverse)
+library(janitor)
+library(ggridges)
+library(kableExtra)
+
+#Read in the data and check it out!
+
+salamander <- read_csv("mack_creek_vertebrates.csv") %>%
+  janitor::clean_names() %>% 
+  filter(species == "DITE")
+
+#it seems like the data is tidy in other ways. I may have to change the data format eventually. This will be my starting point!
 ```
+
+##### Data and Methods
+
+- you need to include a map here!!
+
+##### Results
+
+###### Results A
+
+```{r}
+# We need to first filter by the locations in the data set and then plot it. This is the perfect place to make my ggridges_density dreams come true. 
+
+salamander_cc_og <- salamander %>% 
+  filter(section %in% c("OG", "CC")) %>% 
+  mutate(section_name = ifelse(section == "CC", "Clearcut", "Old Growth"))
+  
+
+#Ok I think that was useless and already done...nevermid I renamed the sections for nicer graphing!
+
+ggplot(data = salamander_cc_og, aes(x = year)) +
+  geom_histogram(binwidth = 1, aes(fill = section_name)) +
+  theme_bw() + 
+  scale_x_continuous(expand = c(0,0), breaks = seq(1993,2017, by = 3)) +
+  scale_y_continuous(expand = c(0,1)) +
+  labs(title = "Pacific giant salamander observations", subtitle = "1993-2017", x = "Year", y = "Counts")+
+  facet_wrap(~section_name) +
+  theme(panel.spacing = unit(2, "lines"), 
+        plot.title = element_text(hjust = 0.5), 
+        plot.subtitle = element_text(hjust = 0.5), 
+        legend.position = "none")
+```
+###### Results B
+
+```{r}
+# We arent interested in salamanders in the side pool, so I need to filter out the pools. I think I'll also need to eventually rename for easier graphing. 
+
+salamander_channel <- salamander %>% 
+  mutate(section_name = ifelse(section == "CC", "Clearcut", "Old Growth")) %>% 
+  mutate(unit_name = ifelse(unittype == "C", "Cascade", ifelse(unittype == "P", "Pool", "Side Channel"))) %>% 
+  filter(unit_name %in% c("Cascade", "Pool", "Side Channel")) %>% 
+  count(unit_name, section_name)
+
+# Now we want to create a table of the counts and proportions
+
+salamander_channel_table <- salamander_channel %>% 
+  pivot_wider(names_from = unit_name, values_from = n)
+
+# It looks like it worked! ok, now time to make it look nice
+channel_unit <- salamander_channel_table %>% 
+  janitor::adorn_percentages(denominator = "row") %>% 
+  adorn_pct_formatting(digits = 1) %>% 
+  adorn_ns(position = "front")
+
+# Ooooh pretty! Now to the kable
+
+kable(channel_unit) %>%
+  kable_styling(bootstrap_options = "striped")
+
+
+```
+##### References
+
+Gregory S. V. 2016. Aquatic Vertebrate Population Study in Mack Creek, Andrews Experimental Forest, 1987 to present. Environmental Data Initiative. https://doi.org/10.6073/pasta/5de64af9c11579266ef20da2ff32f702. Dataset accessed 11/25/2019.
