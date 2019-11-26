@@ -17,6 +17,7 @@ library(tidyverse)
 library(janitor)
 library(ggridges)
 library(kableExtra)
+library(ggbeeswarm)
 
 #Read in the data and check it out!
 
@@ -33,7 +34,7 @@ salamander <- read_csv("mack_creek_vertebrates.csv") %>%
 
 ##### Results
 
-###### Results A
+##### A.
 
 ```{r}
 # We need to first filter by the locations in the data set and then plot it. This is the perfect place to make my ggridges_density dreams come true. 
@@ -57,7 +58,8 @@ ggplot(data = salamander_cc_og, aes(x = year)) +
         plot.subtitle = element_text(hjust = 0.5), 
         legend.position = "none")
 ```
-###### Results B
+
+##### B. 
 
 ```{r}
 # We arent interested in salamanders in the side pool, so I need to filter out the pools. I think I'll also need to eventually rename for easier graphing. 
@@ -66,6 +68,7 @@ salamander_channel <- salamander %>%
   mutate(section_name = ifelse(section == "CC", "Clearcut", "Old Growth")) %>% 
   mutate(unit_name = ifelse(unittype == "C", "Cascade", ifelse(unittype == "P", "Pool", "Side Channel"))) %>% 
   filter(unit_name %in% c("Cascade", "Pool", "Side Channel")) %>% 
+  filter(year == 2017) %>% 
   count(unit_name, section_name)
 
 # Now we want to create a table of the counts and proportions
@@ -81,11 +84,117 @@ channel_unit <- salamander_channel_table %>%
 
 # Ooooh pretty! Now to the kable
 
-kable(channel_unit) %>%
-  kable_styling(bootstrap_options = "striped")
+kable(channel_unit, col.names = c("Section", "Cascade", "Pool", "Side Channel")) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F) %>% 
+  add_header_above(c("2017 Salamander Location" = 4))
 
 
 ```
+
+##### C.
+
+H~0~: There is no significant difference in habitat type population between clear cut and old growth forests
+H~A~: There is a significant difference in habitat population between clear cut and old growth forests
+
+```{r}
+
+# We're comparing counts so this will be a chi-square test. Now some preparation
+
+salamander_chi <- salamander_channel_table %>% 
+  select (-section_name)
+
+# And now for the test
+
+salamander_chi <- chisq.test(salamander_chi)
+
+salamander_chi
+
+```
+
+There is not sufficient evidence to reject the null hypothesis ($\chi^2$(`r salamander_chi$parameter`) = `r round(salamander_chi$statistic, 2)`, *p* = `r round(salamander_chi$p.value,2)`)
+
+*how to get n values in this satatement. I guess you could always just type*
+
+##### D.
+H~0~: There is no significant difference in mean salamander weights between clear cut and old growth forests
+H~A~: There is a significant difference in mean salamander weights between clear cut and old growth forests
+```{r}
+# Since I've done some funky stuff with the above information I'm going to start fresh with the data frame
+
+salamander_wt <- salamander %>% 
+  filter(year == 2017, section %in% c("CC", "OG"))
+
+# first we should look at the data to see if it is normally distributed
+ggplot(data = salamander_wt, aes(x = weight)) +
+  geom_density() + 
+  facet_wrap(~section)
+
+ggplot(data = salamander_wt, aes(sample = weight)) +
+  geom_qq() +
+  facet_wrap(~section)
+
+# oooh looks like not normally distributed, but we still have a large enough sample size to compare per the central limit theorom. Now time to do a two-sample t-test
+salamander_wt_cc <- salamander_wt %>% 
+  filter(section == "CC")
+
+salamander_wt_og <- salamander_wt %>% 
+  filter(section == "OG")
+
+salamander_wt_ttest <- t.test(salamander_wt_cc$weight, salamander_wt_og$weight)
+
+salamander_wt_ttest
+
+# We cannot reject the null hypothesis. 
+
+```
+
+##### E.
+
+```{r}
+# I want to create a beeswarm plot. First to sort out the data as I want to. I also want to drop the salamander that did not have an observed weight. It gives me errors for all C habitats
+
+salamander_wt_habitat <- salamander %>% 
+  filter(year == 2017, section %in% c("CC", "OG"), unittype %in% c("C", "P", "SC")) %>% 
+  drop_na(weight) %>% 
+  group_by(unittype)
+
+# Next I need to create some summary info so I can pull it into the beeswarm
+
+salamander_wt_summary <- salamander_wt_habitat %>% 
+  summarize(mean_salamander_wt = mean(weight), 
+            sd_salamander_wt = sd(weight), 
+            sample_size = n(), 
+            se_salamander_wt = sd(weight)/ sqrt(n()),
+            var_salamander_wt = var(weight))
+  
+# Next to create the graph
+
+ggplot() +
+  geom_beeswarm(data = salamander_wt_habitat, aes(x = unittype, y = weight),
+                size = 1, 
+                alpha = 0.6, 
+                color = "gray60") +
+  theme_bw() +
+  scale_y_continuous(expand = c(0,1)) +
+  scale_x_discrete(labels = c("Cascades", "Pools", "Side-channels")) +
+  geom_point(data = salamander_wt_summary, 
+             aes(x = unittype, y = mean_salamander_wt), 
+             color = "red", 
+             size = 2) +
+  geom_errorbar(data = salamander_wt_summary, 
+                aes(x = unittype,
+                    ymin = mean_salamander_wt - se_salamander_wt, 
+                    ymax = mean_salamander_wt + se_salamander_wt),
+                color = "red",
+                width = 0.1) +
+  labs(title = "Salamander weights and habitat", subtitle = "2017", x = "Channel Habitat", y = "Weight (g)")
+
+
+# the error I'm getting is fine since there is one NA value for weight. Nevermind! I got rid of that as it was causing more problems. Should I change the minimums since they're 
+
+```
+
+
 ##### References
 
 Gregory S. V. 2016. Aquatic Vertebrate Population Study in Mack Creek, Andrews Experimental Forest, 1987 to present. Environmental Data Initiative. https://doi.org/10.6073/pasta/5de64af9c11579266ef20da2ff32f702. Dataset accessed 11/25/2019.
