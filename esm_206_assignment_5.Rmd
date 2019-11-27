@@ -1,23 +1,27 @@
 ---
-title: "Pacific Giant Salamander"
-subtitle: "Prepared for ESM 206"
+title: "Land use effects on Pacific Giant Salamander population and weight"
+subtitle: " A report prepared for ESM 206"
 author: "Maggie Brickner"
 date: "12/04/2019"
 output: html_document
 ---
 
-##### Introduction
+### Introduction
 
-- you need to include an image of a salamander here!
+The Pacific Giant Salamander or Coastal Giant Salamander (*Dicamptodon tenebrosus*) is among the largest terrestrial salamanders in the world. They live in coastal, wet forests usually near water. Growing up to 30 cm (11.8 inches) long, they feed on insects and slugs as well as other amphibians and even small rodents (Naish 2016). Logging is a major threat to the Pacific Giant Salamander. In previous studies logging has been shown to severely decrease the population of Pacific Giant Salamander larvae in streams (AmphibiaWeb 2010). Here I use data collected along Mack Creek within the H.J. Andrews Experimental Forest located in the Cascade Mountain Range in Oregon. Data has been collected on Pacific Giant Salamanders in this area since 1993 in areas that were clearcut in 1963 and in an old growth forest (Gregory 2016). 
+
+
+![**Figure 1.** Mature Pacific Giant Salamader. Credit: [Scientific American](https://blogs.scientificamerican.com/tetrapod-zoology/the-pacific-giant-salamanders/).](coastal_salamander_photo.jpg) 
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
-#Attach the needed packages. This is a work in progress so for now I'll just attach the tidyverse and janitor. More to come though! If there's a reason to use ggridges that could be cool. 
+#Attach the needed packages. This is a work in progress so for now I'll just attach the tidyverse and janitor. More to come though!  
 library(tidyverse)
 library(janitor)
-library(ggridges)
 library(kableExtra)
 library(ggbeeswarm)
+library(car)
 
 #Read in the data and check it out!
 
@@ -28,16 +32,17 @@ salamander <- read_csv("mack_creek_vertebrates.csv") %>%
 #it seems like the data is tidy in other ways. I may have to change the data format eventually. This will be my starting point!
 ```
 
-##### Data and Methods
+### Data and Methods
 
-- you need to include a map here!!
+![**Figure 2.** Study location overlaid on the Andrews Forest informational map. Credit: [H.J. Andrews Experimental Forest](https://andrewsforest.oregonstate.edu/sites/default/files/lter/pubs/pdf/pub3654.pdf).](study_location.png)
+
 
 ##### Results
 
 ##### A.
 
 ```{r}
-# We need to first filter by the locations in the data set and then plot it. This is the perfect place to make my ggridges_density dreams come true. 
+# We need to first filter by the locations in the data set and then plot it. This is the perfect place to make my ggridges_density dreams come true. Never mind it looked bad
 
 salamander_cc_og <- salamander %>% 
   filter(section %in% c("OG", "CC")) %>% 
@@ -180,7 +185,7 @@ ggplot() +
   geom_point(data = salamander_wt_summary, 
              aes(x = unittype, y = mean_salamander_wt), 
              color = "red", 
-             size = 2) +
+             size = 1.5) +
   geom_errorbar(data = salamander_wt_summary, 
                 aes(x = unittype,
                     ymin = mean_salamander_wt - se_salamander_wt, 
@@ -194,7 +199,34 @@ ggplot() +
 
 ```
 
+```{r}
+# Anova test (comparing multiple means) First we want to see if variances are the same, because that's what we assume when using an ANOVA
+
+leveneTest(weight ~ unittype, data = salamander_wt_habitat)
+
+# with an alpha of 0.05 we do not have sufficient evidence to reject the null hypothesis that the means are the same. 
+
+```
+```{r}
+# great! Now we can do an ANOVA!
+
+salamander_aov <- aov(weight ~ unittype, data = salamander_wt_habitat)
+
+summary(salamander_aov)
+
+# Oooh finaly some differentiaton we can reject the null hypothesis! Now for a post hoc test
+
+TukeyHSD(salamander_aov)
+
+# From Tukey it looks like the only distinction is between side channel and pool living salamanders in that Pool salamaders are heavier than side channel salamanders. 
+
+```
 
 ##### References
 
-Gregory S. V. 2016. Aquatic Vertebrate Population Study in Mack Creek, Andrews Experimental Forest, 1987 to present. Environmental Data Initiative. https://doi.org/10.6073/pasta/5de64af9c11579266ef20da2ff32f702. Dataset accessed 11/25/2019.
+AmphibiaWeb. 2010. Dicamptodon tenebrosus: Pacific Giant Salamander. University of California, Berkeley. Retrieved from http://amphibiaweb.org/species/3867
+
+
+Gregory S. V. 2016. Aquatic Vertebrate Population Study in Mack Creek, Andrews Experimental Forest, 1987 to present. Environmental Data Initiative. Retrieved from https://doi.org/10.6073/pasta/5de64af9c11579266ef20da2ff32f702 
+
+Naish, D. 2016. The Pacific Giant Salamanders. Scientific American Tetrapod Zoology Blog. Retrieved from https://blogs.scientificamerican.com/tetrapod-zoology/the-pacific-giant-salamanders/
